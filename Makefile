@@ -73,9 +73,9 @@ format: bin/goimports .GOPATH/.ok
 	    -e "^$$" $(addprefix -e ,$(IGNORED_PACKAGES)) | xargs ./bin/goimports -w
 
 gen: .GOPATH/.ok
- 	@echo "Running go generate"
- 	$Q cd $(CURDIR)/.GOPATH/src/$(IMPORT_PATH) && go generate
- 	@echo "Done!"
+	@echo "Running go generate"
+	$Q cd $(CURDIR)/.GOPATH/src/$(IMPORT_PATH) && go generate
+	@echo "Done!"
 
 ##### =====> Internals <===== #####
 
@@ -93,7 +93,7 @@ setup: clean .GOPATH/.ok
 	(cd $(CURDIR)/.GOPATH/src/$(IMPORT_PATH) && ./bin/dep ensure)
 VERSION          := $(shell git describe --tags --always --dirty="-dev")
 DATE             := $(shell date -u '+%Y-%m-%d-%H%M UTC')
-VERSION_FLAGS    := -ldflags='-X "main.Version=$(VERSION)" -X "main.BuildTime=$(DATE)"'
+VERSION_FLAGS    := -ldflags='-s -w -X "main.Version=$(VERSION)" -X "main.BuildTime=$(DATE)"'
 
 # cd into the GOPATH to workaround ./... not following symlinks
 _allpackages = $(shell ( cd $(CURDIR)/.GOPATH/src/$(IMPORT_PATH) && \
