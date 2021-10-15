@@ -5,7 +5,7 @@
 
 ## dog is better than cat
 
-This is a rewrite of the dog utility oroigoinally written by Jason Cohen
+This is a rewrite of the dog utility originally written by Jason Cohen
 
 The original program was released under GPL v2 and last release I could find was 1.7 released sometime in 2000
 
