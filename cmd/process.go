@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 	"unicode"
@@ -156,14 +157,24 @@ func getVal(t html.Token, s string) (ok bool, href string) {
 }
 
 func doOOG(s string) {
-	//This implementation of OOG is bogus :-/
-	s = strings.ToUpper(s)
-	repl := strings.NewReplacer(" IS ", " ", " ARE ", " ",
-		" AM ", " ", " A ", " ", " AN ", " ", " THAT ", " ", " WHICH ", " ", " THE ", " ", " CAN ", " ", " OUR ", " ", " ANY ", " ", " HIS ", " ", " HERS ", " ",
-		" I ", " OOG ", " IM ", " OOG ", " ME ", " OOG ", " MY ", " OOG'S ", " MINE ", " OOG'S ", " ANOTHER ", " OTHER ", " HAS ", " HAVE ", " HAD ", " HAVE ", " CANNOT ", " NOT ",
-		".", "!!!", ";", "!!!", ":", "!!!", "!", "!!!", "?", "!!!", ",", "", "'", "", "`", "")
-	theString = repl.Replace(s)
+	var oogSayDifferent = map[string]string{"I": "OOG", "IM": "OOG", "ME": "OOG", "MY": "OOG'S", "MINE": "OOG'S", "ANOTHER": "OTHER", "HAS": "HAVE", "HAD": "HAVE", "CANNOT": "NOT", "IS": "", "ARE": "", "AM": "", "A": "", "AN": "", "THAT": "", "WHICH": "", "THE": "", "CAN": "", "OUR": "", "ANY": "", "HIS": "", "HERS": ""}
 
+	//OOG don't like small
+	s = strings.ToUpper(s)
+
+	//OOG don't like contractions
+	repl := strings.NewReplacer("'LL", " WILL", "WON'T", "WILL NOT", "'VE", " HAVE", "CAN'T", "CANNOT", "N'T", " NOT")
+	s = repl.Replace(s)
+
+	//OOG like special punctuation
+	repl = strings.NewReplacer(",", "", "'", "", "!", "!!!", "?", "!!!", ".", "!!!")
+	s = repl.Replace(s)
+
+	for k, v := range oogSayDifferent {
+		s = replaceWord(s, k, v)
+	}
+
+	theString = s
 }
 
 func doKRAD(s string) {
@@ -209,4 +220,11 @@ func doStrFry(s string) {
 	}
 
 	theString = string(myRunes)
+}
+
+func replaceWord(s, original, replace string) string {
+	pattern := `\b` + original + `\b`
+	re := regexp.MustCompile(pattern)
+	return re.ReplaceAllLiteralString(s, replace)
+
 }
