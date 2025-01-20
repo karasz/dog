@@ -1,29 +1,36 @@
-/*
-Copyright © 2021 Nagy Károly Gábriel <k@jpi.io>
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
-*/
-
+// Package main implements "dog", which is a replacement for the Unix cat command
+// with additional features such as strfry, oog, k-rad talk, and more.
+//
+// Flags:
+// - show-all: equivalent to -vET
+// - number-nonblank: precede each non-blank line with its line number
+// - no-blanks: only print lines with non-whitespace characters
+// - dos: convert line endings to DOS-style
+// - show-ends: display $ at the end of each line
+// - hide-nonprinting: hide non-printing characters
+// - hex: display the data as a hex dump
+// - images: list unique, absolute image links from input data
+// - krad: convert lines to k-rad
+// - lines: list of lines to print, comma delimited, ranges allowed
+// - links: list unique, absolute URL links from input data
+// - lower: convert all upper-case characters to lower
+// - mac: convert line endings to Macintosh-style
+// - number: precede each line with its line number
+// - oog: OOG A STRING!!!
+// - rotate: rotate character values (can be negative)
+// - squeeze-blank: never more than one single blank line
+// - strfry: stir-fry each line
+// - show-tabs: display TAB characters as ^I
+// - skip-tags: do not process HTML tags from input, and simply output them as-is
+// - translate: translate end-of-line characters
+// - unix: convert line endings to UNIX-style
+// - upper: convert all lower-case characters to upper
+// - show-nonprinting: use ^ and M- notation, except for TAB
+// - cols: print first 'cols' characters of each line
+//
+// The Execute function runs the root command and handles any errors that occur.
 package main
 
-import "github.com/karasz/dog/cmd"
-
 func main() {
-	cmd.Execute()
+	Execute()
 }

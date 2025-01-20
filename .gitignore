@@ -23,5 +23,8 @@ _testmain.go
 *.test
 *.prof
 /.GOPATH
+/.tmp
 /bin
+/managed_context
+/test_suite_analysis
 *.txt
