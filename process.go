@@ -39,6 +39,7 @@ func processNames(names []string) (io.ReadCloser, error) {
 		if name == "-" {
 			// Read from standard input
 			readers = append(readers, os.Stdin)
+			return multireadcloser.MultiReadCloser(readers...), nil
 		}
 		if strings.HasPrefix(name, "http://") || strings.HasPrefix(name, "https://") {
 			// It's an URI, not a file
@@ -184,7 +185,9 @@ func doCase(s, acase string) {
 	}
 }
 
+//revive:disable:cognitive-complexity
 func doWeb(r io.Reader, kind string) {
+	//revive:enable:cognitive-complexity
 	var builder strings.Builder
 	z := html.NewTokenizer(r)
 	for {
@@ -203,8 +206,15 @@ func doWeb(r io.Reader, kind string) {
 			if !ok {
 				continue
 			}
-			builder.WriteString(url)
-			builder.WriteByte('\n')
+			_, err := builder.WriteString(url)
+			if err != nil {
+				_, _ = fmt.Println(err)
+			}
+
+			err = builder.WriteByte('\n')
+			if err != nil {
+				_, _ = fmt.Println(err)
+			}
 		}
 	}
 }
@@ -231,7 +241,7 @@ var (
 		"MY": "OOG'S", "MINE": "OOG'S", "ANOTHER": "OTHER", "HAS": "HAVE", "HAD": "HAVE",
 		"CANNOT": "NOT", " IS": "", " ARE": "", " AM": "", " A": "", " AN": "",
 		" THAT": "", " WHICH": "", " THE": "", " CAN": "", " OUR": "", " ANY": "", " HIS": "", " HERS": ""}
-	
+
 	oogReplacer = strings.NewReplacer(
 		"'LL", " WILL",
 		"WON'T", "WILL NOT",
@@ -291,7 +301,7 @@ func doRot(s string, r int) {
 		theLineInfo.Content = s
 		return
 	}
-	
+
 	myRunes := []rune(s)
 	for i, c := range myRunes {
 		if unicode.IsLetter(c) {
@@ -372,7 +382,7 @@ func doCols(s string, cols int) {
 		theLineInfo.Content = s
 		return
 	}
-	
+
 	runes := []rune(s)
 	if len(runes) > cols {
 		theLineInfo.Content = string(runes[:cols])
