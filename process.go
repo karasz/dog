@@ -169,11 +169,10 @@ func processFlags(line string, readLine *strings.Reader) {
 	}
 }
 
+var showAllReplacer = strings.NewReplacer("\r", "^M", "\n", "^J", "\t", "^I")
+
 func doShowAll(s string) {
-	s = strings.ReplaceAll(s, "\r", "^M")
-	s = strings.ReplaceAll(s, "\n", "^J")
-	s = strings.ReplaceAll(s, "\t", "^I")
-	theLineInfo.Content = s
+	theLineInfo.Content = showAllReplacer.Replace(s)
 }
 
 func doCase(s, acase string) {
@@ -186,12 +185,13 @@ func doCase(s, acase string) {
 }
 
 func doWeb(r io.Reader, kind string) {
-	theLineInfo.Content = ""
+	var builder strings.Builder
 	z := html.NewTokenizer(r)
 	for {
 		tt := z.Next()
 		switch {
 		case tt == html.ErrorToken:
+			theLineInfo.Content = builder.String()
 			return
 		case tt == html.StartTagToken:
 			t := z.Token()
@@ -203,7 +203,8 @@ func doWeb(r io.Reader, kind string) {
 			if !ok {
 				continue
 			}
-			theLineInfo.Content = theLineInfo.Content + fmt.Sprintf("%s\n", url)
+			builder.WriteString(url)
+			builder.WriteByte('\n')
 		}
 	}
 }
@@ -225,28 +226,31 @@ func getVal(t html.Token, s string) (bool, string) {
 	return ok, href
 }
 
-func doOOG(s string) {
-	var oogSayDifferent = map[string]string{"I": "OOG", "IM": "OOG", "ME": "OOG",
+var (
+	oogSayDifferent = map[string]string{"I": "OOG", "IM": "OOG", "ME": "OOG",
 		"MY": "OOG'S", "MINE": "OOG'S", "ANOTHER": "OTHER", "HAS": "HAVE", "HAD": "HAVE",
 		"CANNOT": "NOT", " IS": "", " ARE": "", " AM": "", " A": "", " AN": "",
 		" THAT": "", " WHICH": "", " THE": "", " CAN": "", " OUR": "", " ANY": "", " HIS": "", " HERS": ""}
+	
+	oogReplacer = strings.NewReplacer(
+		"'LL", " WILL",
+		"WON'T", "WILL NOT",
+		"'VE", " HAVE",
+		"CAN'T", "CANNOT",
+		"N'T", " NOT",
+		",", "",
+		"'", "",
+		"!", "!!!",
+		"?", "!!!",
+		".", "!!!")
+)
 
+func doOOG(s string) {
 	// OOG don't like small
 	s = strings.ToUpper(s)
 
-	// OOG don't like contractions
-	s = strings.ReplaceAll(s, "'LL", " WILL")
-	s = strings.ReplaceAll(s, "WON'T", "WILL NOT")
-	s = strings.ReplaceAll(s, "'VE", " HAVE")
-	s = strings.ReplaceAll(s, "CAN'T", "CANNOT")
-	s = strings.ReplaceAll(s, "N'T", " NOT")
-
-	// OOG like special punctuation
-	s = strings.ReplaceAll(s, ",", "")
-	s = strings.ReplaceAll(s, "'", "")
-	s = strings.ReplaceAll(s, "!", "!!!")
-	s = strings.ReplaceAll(s, "?", "!!!")
-	s = strings.ReplaceAll(s, ".", "!!!")
+	// OOG don't like contractions and punctuation
+	s = oogReplacer.Replace(s)
 
 	for k, v := range oogSayDifferent {
 		s = replaceWord(s, k, v)
@@ -255,37 +259,39 @@ func doOOG(s string) {
 	theLineInfo.Content = s
 }
 
+var kralReplacer = strings.NewReplacer(
+	"0", "o",
+	"1", "l",
+	"ate", "8",
+	"see", "C",
+	"a", "4",
+	"e", "3",
+	"b", "6",
+	"l", "1",
+	"o", "0",
+	"s", "5",
+	"t", "7")
+
 func doKRAD(s string) {
-	s = strings.ReplaceAll(s, "0", "o")
-	s = strings.ReplaceAll(s, "1", "l")
-	s = strings.ReplaceAll(s, "a", "4")
-	s = strings.ReplaceAll(s, "ate", "8")
-	s = strings.ReplaceAll(s, "e", "3")
-	s = strings.ReplaceAll(s, "b", "6")
-	s = strings.ReplaceAll(s, "l", "1")
-	s = strings.ReplaceAll(s, "o", "0")
-	s = strings.ReplaceAll(s, "s", "5")
-	s = strings.ReplaceAll(s, "see", "C")
-	s = strings.ReplaceAll(s, "t", "7")
-	theLineInfo.Content = s
+	theLineInfo.Content = kralReplacer.Replace(s)
 }
 
 func doHex(s string) {
 	theLineInfo.Content = h.Dump([]byte(s))
 }
 
-func doShowEnds(s string) {
-	// Windows
-	s = strings.ReplaceAll(s, "\r\n", "$\r\n")
-	// Linux/Unix
-	s = strings.ReplaceAll(s, "\n", "$\n")
-	// Old MacOS
-	s = strings.ReplaceAll(s, "\r", "$\r")
+var showEndsReplacer = strings.NewReplacer("\r\n", "$\r\n", "\n", "$\n", "\r", "$\r")
 
-	theLineInfo.Content = s
+func doShowEnds(s string) {
+	theLineInfo.Content = showEndsReplacer.Replace(s)
 }
 
 func doRot(s string, r int) {
+	if r == 0 {
+		theLineInfo.Content = s
+		return
+	}
+	
 	myRunes := []rune(s)
 	for i, c := range myRunes {
 		if unicode.IsLetter(c) {
@@ -362,8 +368,14 @@ func doShowNonPrinting(_ string) {
 }
 
 func doCols(s string, cols int) {
-	if len(s) > cols {
-		theLineInfo.Content = s[:cols]
+	if len(s) <= cols {
+		theLineInfo.Content = s
+		return
+	}
+	
+	runes := []rune(s)
+	if len(runes) > cols {
+		theLineInfo.Content = string(runes[:cols])
 	} else {
 		theLineInfo.Content = s
 	}
