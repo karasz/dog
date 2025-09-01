@@ -113,106 +113,134 @@ func processSingleLine(line string, lineNumber int) {
 
 func processLine(lineInfo LineInfo) {
 	theLineInfo = lineInfo
+	processedContent := processFlags(lineInfo.Content)
+	theLineInfo.Content = processedContent
 
-	readLine := strings.NewReader(lineInfo.Content)
+	// Suppress empty lines for HTML extraction flags
+	if (theflags.Changed("links") || theflags.Changed("images")) && strings.TrimSpace(theLineInfo.Content) == "" {
+		return
+	}
 
-	processFlags(lineInfo.Content, readLine)
-
-	_, _ = fmt.Fprintf(os.Stdout, "%d: %s\n", theLineInfo.LineNumber, theLineInfo.Content)
-}
-
-func getBoolActions(line string, readLine *strings.Reader) map[string]func() {
-	return map[string]func(){
-		"showAll":         func() { doShowAll(line) },
-		"links":           func() { doWeb(readLine, "a") },
-		"images":          func() { doWeb(readLine, "img") },
-		"oog":             func() { doOOG(line) },
-		"krad":            func() { doKRAD(line) },
-		"lower":           func() { doCase(line, "lower") },
-		"upper":           func() { doCase(line, "upper") },
-		"hex":             func() { doHex(line) },
-		"showEnds":        func() { doShowEnds(line) },
-		"numberNonBlank":  func() { doNumberNonBlank(line) },
-		"noBlanks":        func() { doNoBlanks(line) },
-		"dos":             func() { doDos(line) },
-		"hideNonPrinting": func() { doHideNonPrinting(line) },
-		"mac":             func() { doMac(line) },
-		"number":          nil,
-		"squeezeBlank":    func() { doSqueezeBlank(line) },
-		"strfry":          func() { doStrFry(line) },
-		"showTabs":        func() { doShowTabs(line) },
-		"skipTags":        func() { doSkipTags(line) },
-		"translate":       func() { doTranslate(line) },
-		"unix":            func() { doUnix(line) },
-		"showNonPrinting": func() { doShowNonPrinting(line) },
+	if theflags.Changed("number") || theflags.Changed("numberNonBlank") {
+		_, _ = fmt.Fprintf(os.Stdout, "%d: %s\n", theLineInfo.LineNumber, theLineInfo.Content)
+	} else {
+		_, _ = fmt.Fprintf(os.Stdout, "%s\n", theLineInfo.Content)
 	}
 }
 
-func getIntActions(line string) map[string]func(int) {
-	return map[string]func(int){
-		"rot": func(i int) {
-			doRot(line, i)
-		},
-		"cols": func(i int) {
-			if i != 0 {
-				doCols(line, i)
-			}
-		},
+// FlagProcessor manages the transformation pipeline for processing multiple flags
+type FlagProcessor struct {
+	content         string
+	originalContent string
+}
+
+func (fp *FlagProcessor) applyTransformation(fn func(string) string) {
+	fp.content = fn(fp.content)
+}
+
+func (fp *FlagProcessor) applyHTMLExtraction(kind string) {
+	readLine := strings.NewReader(fp.originalContent)
+	fp.content = extractFromHTML(readLine, kind)
+}
+
+func processHTMLExtractionFlags(fp *FlagProcessor) bool {
+	if theflags.Changed("links") {
+		fp.applyHTMLExtraction("a")
+		return true
+	}
+	if theflags.Changed("images") {
+		fp.applyHTMLExtraction("img")
+		return true
+	}
+	return false
+}
+
+func processTextTransformationFlags(fp *FlagProcessor) {
+	if theflags.Changed("oog") {
+		fp.applyTransformation(transformOOG)
+	}
+	if theflags.Changed("krad") {
+		fp.applyTransformation(transformKRAD)
+	}
+	if theflags.Changed("lower") {
+		fp.applyTransformation(strings.ToLower)
+	}
+	if theflags.Changed("upper") {
+		fp.applyTransformation(strings.ToUpper)
+	}
+	if theflags.Changed("strfry") {
+		fp.applyTransformation(transformStrFry)
 	}
 }
 
-func processBoolFlags(actions map[string]func()) {
-	for flag, action := range actions {
-		if theflags.Changed(flag) && action != nil {
-			action()
-		}
+func applyRotFlag(fp *FlagProcessor) {
+	if rotValue, err := theflags.GetInt("rot"); err == nil {
+		fp.applyTransformation(func(s string) string {
+			return transformRot(s, rotValue)
+		})
 	}
 }
 
-func processIntFlags(actions map[string]func(int)) {
-	for flag, action := range actions {
-		if flagValue, err := theflags.GetInt(flag); err == nil {
-			if theflags.Changed(flag) && action != nil {
-				action(flagValue)
-			}
-		}
+func applyColsFlag(fp *FlagProcessor) {
+	if colsValue, err := theflags.GetInt("cols"); err == nil && colsValue != 0 {
+		fp.applyTransformation(func(s string) string {
+			return transformCols(s, colsValue)
+		})
 	}
 }
 
-func processFlags(line string, readLine *strings.Reader) {
-	boolActions := getBoolActions(line, readLine)
-	intActions := getIntActions(line)
-
-	processBoolFlags(boolActions)
-	processIntFlags(intActions)
-}
-
-var showAllReplacer = strings.NewReplacer("\r", "^M", "\n", "^J", "\t", "^I")
-
-func doShowAll(s string) {
-	theLineInfo.Content = showAllReplacer.Replace(s)
-}
-
-func doCase(s, acase string) {
-	switch acase {
-	case "lower":
-		theLineInfo.Content = strings.ToLower(s)
-	case "upper":
-		theLineInfo.Content = strings.ToUpper(s)
+func processIntegerFlags(fp *FlagProcessor) {
+	if theflags.Changed("rot") {
+		applyRotFlag(fp)
+	}
+	if theflags.Changed("cols") {
+		applyColsFlag(fp)
 	}
 }
 
-//revive:disable:cognitive-complexity
-func doWeb(r io.Reader, kind string) {
-	//revive:enable:cognitive-complexity
+func processFormatFlags(fp *FlagProcessor) {
+	if theflags.Changed("hex") {
+		fp.applyTransformation(transformHex)
+	}
+	if theflags.Changed("showAll") {
+		fp.applyTransformation(transformShowAll)
+	}
+	if theflags.Changed("showEnds") {
+		fp.applyTransformation(transformShowEnds)
+	}
+	if theflags.Changed("showTabs") {
+		fp.applyTransformation(transformShowTabs)
+	}
+	if theflags.Changed("showNonPrinting") {
+		fp.applyTransformation(transformShowNonPrinting)
+	}
+}
+
+func processFlags(line string) string {
+	fp := &FlagProcessor{
+		content:         line,
+		originalContent: line,
+	}
+
+	if processHTMLExtractionFlags(fp) {
+		return fp.content
+	}
+
+	processTextTransformationFlags(fp)
+	processIntegerFlags(fp)
+	processFormatFlags(fp)
+
+	return fp.content
+}
+
+func extractFromHTML(r io.Reader, kind string) string {
 	var builder strings.Builder
 	z := html.NewTokenizer(r)
 	for {
 		tt := z.Next()
 		switch {
 		case tt == html.ErrorToken:
-			theLineInfo.Content = builder.String()
-			return
+			return builder.String()
 		case tt == html.StartTagToken:
 			t := z.Token()
 			isElement := t.Data == kind
@@ -223,17 +251,93 @@ func doWeb(r io.Reader, kind string) {
 			if !ok {
 				continue
 			}
-			_, err := builder.WriteString(url)
-			if err != nil {
-				_, _ = fmt.Println(err)
-			}
-
-			err = builder.WriteByte('\n')
-			if err != nil {
-				_, _ = fmt.Println(err)
-			}
+			_, _ = builder.WriteString(url + "\n")
 		}
 	}
+}
+
+var showAllReplacer = strings.NewReplacer("\r", "^M", "\n", "^J", "\t", "^I")
+
+func transformShowAll(s string) string {
+	return showAllReplacer.Replace(s)
+}
+
+func transformOOG(s string) string {
+	// OOG don't like small
+	s = strings.ToUpper(s)
+	// OOG don't like contractions and punctuation
+	s = oogReplacer.Replace(s)
+	for k, v := range oogSayDifferent {
+		s = replaceWord(s, k, v)
+	}
+	return s
+}
+
+func transformKRAD(s string) string {
+	return kralReplacer.Replace(s)
+}
+
+func transformHex(s string) string {
+	return h.Dump([]byte(s))
+}
+
+func transformShowEnds(s string) string {
+	return showEndsReplacer.Replace(s)
+}
+
+func transformStrFry(s string) string {
+	myRunes := []rune(s)
+	var j int
+	for i := len(myRunes) - 1; i > 0; i-- {
+		j = rand.Intn(i)
+		myRunes[j], myRunes[i] = myRunes[i], myRunes[j]
+	}
+	return string(myRunes)
+}
+
+func transformRot(s string, r int) string {
+	if r == 0 {
+		return s
+	}
+	myRunes := []rune(s)
+	for i, c := range myRunes {
+		if unicode.IsLetter(c) {
+			myRunes[i] = rune(int(c) + r)
+		}
+	}
+	return string(myRunes)
+}
+
+func transformCols(s string, cols int) string {
+	if cols <= 0 {
+		return s
+	}
+
+	runes := []rune(s)
+	if len(runes) <= cols {
+		return s
+	}
+
+	var result strings.Builder
+	for i := 0; i < len(runes); i += cols {
+		end := min(i+cols, len(runes))
+		_, _ = result.WriteString(string(runes[i:end]))
+		if end < len(runes) {
+			_ = result.WriteByte('\n')
+		}
+	}
+
+	return result.String()
+}
+
+func transformShowTabs(s string) string {
+	// TODO: Implement show tabs transformation
+	return s
+}
+
+func transformShowNonPrinting(s string) string {
+	// TODO: Implement show non-printing transformation
+	return s
 }
 
 func getVal(t html.Token, s string) (bool, string) {
@@ -272,20 +376,6 @@ var (
 		".", "!!!")
 )
 
-func doOOG(s string) {
-	// OOG don't like small
-	s = strings.ToUpper(s)
-
-	// OOG don't like contractions and punctuation
-	s = oogReplacer.Replace(s)
-
-	for k, v := range oogSayDifferent {
-		s = replaceWord(s, k, v)
-	}
-
-	theLineInfo.Content = s
-}
-
 var kralReplacer = strings.NewReplacer(
 	"0", "o",
 	"1", "l",
@@ -299,46 +389,7 @@ var kralReplacer = strings.NewReplacer(
 	"s", "5",
 	"t", "7")
 
-func doKRAD(s string) {
-	theLineInfo.Content = kralReplacer.Replace(s)
-}
-
-func doHex(s string) {
-	theLineInfo.Content = h.Dump([]byte(s))
-}
-
 var showEndsReplacer = strings.NewReplacer("\r\n", "$\r\n", "\n", "$\n", "\r", "$\r")
-
-func doShowEnds(s string) {
-	theLineInfo.Content = showEndsReplacer.Replace(s)
-}
-
-func doRot(s string, r int) {
-	if r == 0 {
-		theLineInfo.Content = s
-		return
-	}
-
-	myRunes := []rune(s)
-	for i, c := range myRunes {
-		if unicode.IsLetter(c) {
-			myRunes[i] = rune(int(c) + r)
-		}
-	}
-	theLineInfo.Content = string(myRunes)
-}
-
-func doStrFry(s string) {
-	myRunes := []rune(s)
-
-	var j int
-	for i := len(myRunes) - 1; i > 0; i-- {
-		j = rand.Intn(i)
-		myRunes[j], myRunes[i] = myRunes[i], myRunes[j]
-	}
-
-	theLineInfo.Content = string(myRunes)
-}
 
 func replaceWord(s, original, replace string) string {
 	pattern := `\b` + original + `\b`
@@ -392,18 +443,4 @@ func doUnix(_ string) {
 
 func doShowNonPrinting(_ string) {
 	// TODO: Implement the logic for showNonPrinting flag
-}
-
-func doCols(s string, cols int) {
-	if len(s) <= cols {
-		theLineInfo.Content = s
-		return
-	}
-
-	runes := []rune(s)
-	if len(runes) > cols {
-		theLineInfo.Content = string(runes[:cols])
-	} else {
-		theLineInfo.Content = s
-	}
 }
