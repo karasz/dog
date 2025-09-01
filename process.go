@@ -30,45 +30,55 @@ type LineInfo struct {
 var theLineInfo LineInfo
 var theflags pflag.FlagSet
 
-//revive:disable:cognitive-complexity
 func processNames(names []string) (io.ReadCloser, error) {
-	// revive:enable:cognitive-complexity
 	readers := make([]io.ReadCloser, 0, len(names))
 
 	for _, name := range names {
-		if name == "-" {
-			// Read from standard input
-			readers = append(readers, os.Stdin)
-			return multireadcloser.MultiReadCloser(readers...), nil
-		}
-		if strings.HasPrefix(name, "http://") || strings.HasPrefix(name, "https://") {
-			// It's an URI, not a file
-			var netClient = &http.Client{
-				Timeout: time.Second * 10,
-			}
-			resp, err := netClient.Get(name)
-
-			if err != nil {
-				return nil, err
-			}
-
-			// Check the Content-Length header
-			if resp.ContentLength > maxHTTPBodySize {
-				// TODO: handle it, do not just return an error
-				_, _ = fmt.Printf("The resource is too large: %d bytes. What would you like to do?\n",
-					resp.ContentLength)
-				return nil, fmt.Errorf("resource is too large: %d bytes", resp.ContentLength)
-			}
-
-			readers = append(readers, resp.Body)
-		}
-		r, err := os.Open(name)
+		reader, err := createReader(name)
 		if err != nil {
 			return nil, err
 		}
-		readers = append(readers, r)
+		readers = append(readers, reader)
+
+		if name == "-" {
+			return multireadcloser.MultiReadCloser(readers...), nil
+		}
 	}
 	return multireadcloser.MultiReadCloser(readers...), nil
+}
+
+func createReader(name string) (io.ReadCloser, error) {
+	if name == "-" {
+		return os.Stdin, nil
+	}
+
+	if isHTTPURL(name) {
+		return createHTTPReader(name)
+	}
+
+	return os.Open(name)
+}
+
+func isHTTPURL(name string) bool {
+	return strings.HasPrefix(name, "http://") || strings.HasPrefix(name, "https://")
+}
+
+func createHTTPReader(url string) (io.ReadCloser, error) {
+	netClient := &http.Client{
+		Timeout: time.Second * 10,
+	}
+	resp, err := netClient.Get(url)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.ContentLength > maxHTTPBodySize {
+		_, _ = fmt.Printf("The resource is too large: %d bytes. What would you like to do?\n",
+			resp.ContentLength)
+		return nil, fmt.Errorf("resource is too large: %d bytes", resp.ContentLength)
+	}
+
+	return resp.Body, nil
 }
 func processFiles(fl io.ReadCloser, flags pflag.FlagSet) error {
 	defer fl.Close()
