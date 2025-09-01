@@ -121,13 +121,8 @@ func processLine(lineInfo LineInfo) {
 	_, _ = fmt.Fprintf(os.Stdout, "%d: %s\n", theLineInfo.LineNumber, theLineInfo.Content)
 }
 
-// revive:disable:cognitive-complexity
-// revive:disable:cyclomatic
-func processFlags(line string, readLine *strings.Reader) {
-	// revive:enable:cognitive-complexity
-	// revive:enable:cyclomatic
-
-	boolActions := map[string]func(){
+func getBoolActions(line string, readLine *strings.Reader) map[string]func() {
+	return map[string]func(){
 		"showAll":         func() { doShowAll(line) },
 		"links":           func() { doWeb(readLine, "a") },
 		"images":          func() { doWeb(readLine, "img") },
@@ -151,8 +146,10 @@ func processFlags(line string, readLine *strings.Reader) {
 		"unix":            func() { doUnix(line) },
 		"showNonPrinting": func() { doShowNonPrinting(line) },
 	}
+}
 
-	intActions := map[string]func(int){
+func getIntActions(line string) map[string]func(int) {
+	return map[string]func(int){
 		"rot": func(i int) {
 			doRot(line, i)
 		},
@@ -162,22 +159,32 @@ func processFlags(line string, readLine *strings.Reader) {
 			}
 		},
 	}
+}
 
-	for flag, action := range boolActions {
-		//	if flagValue, err := theflags.GetBool(flag); err == nil && flagValue {
+func processBoolFlags(actions map[string]func()) {
+	for flag, action := range actions {
 		if theflags.Changed(flag) && action != nil {
 			action()
 		}
-		//	}
 	}
+}
 
-	for flag, action := range intActions {
+func processIntFlags(actions map[string]func(int)) {
+	for flag, action := range actions {
 		if flagValue, err := theflags.GetInt(flag); err == nil {
 			if theflags.Changed(flag) && action != nil {
 				action(flagValue)
 			}
 		}
 	}
+}
+
+func processFlags(line string, readLine *strings.Reader) {
+	boolActions := getBoolActions(line, readLine)
+	intActions := getIntActions(line)
+
+	processBoolFlags(boolActions)
+	processIntFlags(intActions)
 }
 
 var showAllReplacer = strings.NewReplacer("\r", "^M", "\n", "^J", "\t", "^I")
