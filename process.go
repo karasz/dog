@@ -29,6 +29,7 @@ type LineInfo struct {
 
 var theLineInfo LineInfo
 var theflags pflag.FlagSet
+var nonBlankLineNumber int
 
 func processNames(names []string) (io.ReadCloser, error) {
 	readers := make([]io.ReadCloser, 0, len(names))
@@ -84,6 +85,7 @@ func processFiles(fl io.ReadCloser, flags pflag.FlagSet) error {
 	defer fl.Close()
 
 	theflags = flags
+	nonBlankLineNumber = 0 // Reset counter for each file processing
 	reader := bufio.NewReader(fl)
 	return readLines(reader)
 }
@@ -121,8 +123,17 @@ func processLine(lineInfo LineInfo) {
 		return
 	}
 
-	if theflags.Changed("number") || theflags.Changed("numberNonBlank") {
+	// Handle line numbering
+	if theflags.Changed("number") {
 		_, _ = fmt.Fprintf(os.Stdout, "%d: %s\n", theLineInfo.LineNumber, theLineInfo.Content)
+	} else if theflags.Changed("numberNonBlank") {
+		// Only increment and show line number for non-blank lines
+		if strings.TrimSpace(theLineInfo.Content) != "" {
+			nonBlankLineNumber++
+			_, _ = fmt.Fprintf(os.Stdout, "%d: %s\n", nonBlankLineNumber, theLineInfo.Content)
+		} else {
+			_, _ = fmt.Fprintf(os.Stdout, "%s\n", theLineInfo.Content)
+		}
 	} else {
 		_, _ = fmt.Fprintf(os.Stdout, "%s\n", theLineInfo.Content)
 	}
@@ -398,7 +409,9 @@ func replaceWord(s, original, replace string) string {
 }
 
 func doNumberNonBlank(_ string) {
-	// TODO: Implement the logic for numberNonBlank flag
+	// The numberNonBlank functionality is implemented in processLine function
+	// This function exists for consistency but the actual logic is handled
+	// in the main processing pipeline where line numbering occurs
 }
 
 func doNoBlanks(_ string) {
